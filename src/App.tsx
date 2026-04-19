@@ -32,7 +32,8 @@ import {
   AlertCircle,
   CheckSquare,
   Square,
-  Save
+  Save,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -51,13 +52,66 @@ const App = () => {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [gasCode, setGasCode] = useState('');
   const [formSourceCode, setFormSourceCode] = useState('');
-  const [selectedTheme, setSelectedTheme] = useState('極簡現代風 (Minimalist)');
+  const [selectedStyle, setSelectedStyle] = useState('極簡現代風 (Minimalist)');
   const [customFormCode, setCustomFormCode] = useState('');
   const [viewMode, setViewMode] = useState('preview');
   const [checkedSteps, setCheckedSteps] = useState<Record<string, boolean>>({});
   const [showSaveToast, setShowSaveToast] = useState(false);
+  const [aiUsage, setAiUsage] = useState({ count: 0, firstCallAt: 0 });
+  const [showLimitAlert, setShowLimitAlert] = useState(false);
 
-  // --- Auto Save (LocalStorage) ---
+  // --- Right-click & Keyboard Protection ---
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+      if (
+        e.key === 'F12' || 
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j')) ||
+        (e.ctrlKey && (e.key === 'U' || e.key === 'u' || e.key === 'S' || e.key === 's'))
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // --- AI Rate Limit Check ---
+  useEffect(() => {
+    const saved = localStorage.getItem('ai_generation_usage');
+    if (saved) {
+      try {
+        setAiUsage(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, []);
+
+  const checkAiLimit = () => {
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000;
+    let currentUsage = { ...aiUsage };
+
+    if (now - currentUsage.firstCallAt > oneHour) {
+      currentUsage = { count: 1, firstCallAt: now };
+    } else {
+      if (currentUsage.count >= 10) {
+        setShowLimitAlert(true);
+        return false;
+      }
+      currentUsage.count += 1;
+      if (currentUsage.firstCallAt === 0) currentUsage.firstCallAt = now;
+    }
+
+    setAiUsage(currentUsage);
+    localStorage.setItem('ai_generation_usage', JSON.stringify(currentUsage));
+    return true;
+  };
   useEffect(() => {
     const savedData = localStorage.getItem('googleFormGenDraft');
     if (savedData) {
@@ -86,16 +140,19 @@ const App = () => {
   }, [formData, generatedContent, formSourceCode]);
 
   // --- Configs ---
-  const themes = [
+  const baseStyles = [
     { name: '極簡現代風 (Minimalist)', colors: ['bg-slate-100', 'bg-slate-800', 'bg-white'] },
     { name: '活潑俏皮風 (Playful)', colors: ['bg-yellow-400', 'bg-pink-500', 'bg-blue-400'] },
     { name: '專業商務風 (Corporate)', colors: ['bg-blue-800', 'bg-gray-100', 'bg-blue-600'] },
     { name: '溫馨柔和風 (Warm & Soft)', colors: ['bg-orange-100', 'bg-rose-300', 'bg-stone-50'] },
     { name: '科技未來風 (Cyberpunk)', colors: ['bg-indigo-900', 'bg-cyan-400', 'bg-fuchsia-500'] },
     { name: '自然森系風 (Nature)', colors: ['bg-emerald-800', 'bg-green-100', 'bg-teal-600'] },
-    { name: '流光曲條 (Animated Waves)', colors: ['bg-indigo-600', 'bg-blue-400', 'bg-cyan-300'], isDynamic: true },
-    { name: '炫彩極光 (Dynamic Aurora)', colors: ['bg-fuchsia-600', 'bg-indigo-700', 'bg-emerald-400'], isDynamic: true },
-    { name: '粒子律動 (Floating Particles)', colors: ['bg-slate-900', 'bg-slate-700', 'bg-slate-500'], isDynamic: true }
+    { name: '玻璃擬態 (Glassmorphism)', colors: ['bg-white/30', 'bg-indigo-500/20', 'bg-blue-200/40'] },
+    { name: '暗黑奢華 (Dark Luxury)', colors: ['bg-black', 'bg-amber-600', 'bg-zinc-900'] },
+    { name: '粗獷主義 (Brutalist)', colors: ['bg-yellow-300', 'bg-black', 'bg-white'] },
+    { name: '手寫筆記風 (Paper)', colors: ['bg-stone-100', 'bg-blue-500', 'bg-white'] },
+    { name: '復古 90 年代 (Retro Web)', colors: ['bg-gray-300', 'bg-blue-800', 'bg-white'] },
+    { name: '清新雜誌報刊 (Editorial)', colors: ['bg-white', 'bg-slate-900', 'bg-slate-50'] }
   ];
 
   const stepsConfig = [
@@ -160,6 +217,7 @@ const App = () => {
 
   // 1. 生成問卷內容
   const generateSurveyContent = async () => {
+    if (!checkAiLimit()) return;
     setStep(2);
     setIsGenerating(true);
     const systemPrompt = `你是一位專業的問卷設計師。請根據使用者的「目的」與「對象」設計邏輯嚴謹的問卷內容。
@@ -173,6 +231,7 @@ const App = () => {
 
   // 2. AI 魔法微調
   const tweakSurveyContent = async (tweakPrompt: string) => {
+    if (!checkAiLimit()) return;
     setIsTweaking(true);
     const systemPrompt = `你是一位專業問卷設計師。請根據使用者的「修改指示」，針對「目前問卷內容」進行調整。
     請直接輸出修改後的完整問卷內容，保持原有架構(標題、開場白、題目、致謝辭)，絕對不要加上任何額外的問候語或解釋說明文字。`;
@@ -186,6 +245,7 @@ const App = () => {
 
   // 3. 生成 GAS 程式碼
   const generateGasCode = async () => {
+    if (!checkAiLimit()) return;
     setStep(3);
     setIsGenerating(true);
     const systemPrompt = `你精通 Google Apps Script。請根據「問卷內容」撰寫一段自動建立 Google 表單的程式碼。
@@ -203,6 +263,7 @@ const App = () => {
 
   // 4. 生成 HTML
   const generateCustomFormCode = async () => {
+    if (!checkAiLimit()) return;
     setIsGenerating(true);
     setCustomFormCode('');
     const systemPrompt = `你是一個嚴格的 HTML 產生器。
@@ -216,16 +277,27 @@ const App = () => {
     5. HTML 中必須包含用來攔截跳轉的隱藏 iframe 與觸發機制：
        <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted){ document.getElementById('success-message').style.display='flex'; document.getElementById('custom-form').style.display='none'; }"></iframe>
        同時 form 標籤加上 onsubmit="window.submitted = true;"
-    6. 依據「主題風格」設計 RWD 介面。必須包含一個預設隱藏的精美成功訊息區塊 (id="success-message", style="display:none;") 與表單區塊 (id="custom-form")。
-    7. 如果「主題風格」標註為「Dynamic」或「動態」，請使用 CSS 關鍵影格 (Keyframes) 或 HTML5 Canvas 實作背景動畫。例如：
-       - 「流光曲條」：使用 SVG 濾鏡或複數個帶有動畫的波浪路徑。
-       - 「炫彩極光」：使用 animated mesh gradients。
-       - 「粒子律動」：在背景層加入一個 Canvas，並用 JavaScript 繪製漂浮的粒子效果。
-       確保動畫流暢且不影響表單內容的閱讀。
+    6. 依據「底色主題風格」設計 RWD 介面。必須包含一個預設隱藏的精美成功訊息區塊 (id="success-message", style="display:none;") 與表單區塊 (id="custom-form")。
+    7. 響應式佈局要求：
+       - 表單容器必須使用 max-w-4xl mx-auto w-full px-4，確保在電腦上寬度更加開闊，在手機上自動適配。
+       - 文字大小需具備流動性，標題使用 text-2xl md:text-4xl，一般文字使用 text-base md:text-xl，確保大螢幕上有更佳的視覺呈現。
+    8. 組合設計要求：
+       - 你需要將「底色主題風格」的外觀規範，套用到該 HTML 中。
+       - 特定風格規範：
+         - 「玻璃擬態」：使用 backdrop-blur-md 與透明度背景，容器邊框建議帶有極細的白色半透明描邊。
+         - 「暗黑奢華」：使用純黑背景搭配金/古銅色 (amber/orange) 元素，字體使用優雅的 Serif。
+         - 「粗獷主義」：使用極粗黑框 (border-4)、亮黃/亮綠配色、不使用圓角 (rounded-none)，字體使用粗體大文字。
+         - 「手寫筆記風」：背景使用淺米色，表單欄位像是在橫線紙上的排版，帶有淡藍/淡紅的隔線感，使用手寫體風格的字體 (可用 Google Fonts)。
+         - 「復古 90 年代」：模擬舊 Windows 視窗介面，使用灰色立體邊框 (#c0c0c0)、藍色標題列與 Pixel 風格字體。
+         - 「清新雜誌報刊」：大標題、大量留白、字體使用優雅的 Serif 與 Sans-serif 混搭，版面偏向報紙排版。
+    8. 安全性要求 (程式碼保護)：
+       - 在生成的 HTML 中加入 JavaScript，禁用右鍵選單 (contextmenu)。
+       - 禁用常見的開發者工具快捷鍵 (F12, Ctrl+Shift+I, Ctrl+U)。
+       - 透過簡單的變數名混淆或邏輯處理，保護表單原始提交路徑不被直接識別。
     
     再次警告：只回傳 HTML 程式碼，開頭必須是 <!DOCTYPE html>，不要說任何廢話。`;
 
-    const text = await callGemini(`【主題風格】：${selectedTheme}\n【表單原始碼】：\n${formSourceCode}`, systemPrompt);
+    const text = await callGemini(`【底色主題風格】：${selectedStyle}\n【表單原始碼】：\n${formSourceCode}`, systemPrompt);
     let finalHtml = text;
     
     const htmlMatch = text.match(/`{3}(?:html)?\n?([\s\S]*?)\n?`{3}/i);
@@ -276,6 +348,37 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-4 md:p-8 flex items-center justify-center">
       
+      {/* Rate Limit Alert Modal */}
+      <AnimatePresence>
+        {showLimitAlert && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6"
+            >
+              <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-10 h-10" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-slate-800">AI 生成次數已達上限</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  為了確保服務穩定性，每小時僅限使用 10 次 AI 生成功能。<br />
+                  請於一小時後再試，或檢查目前的生成內容。
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowLimitAlert(false)}
+                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors"
+              >
+                我知道了
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Toast Notification */}
       <AnimatePresence>
         {showSaveToast && (
@@ -596,30 +699,23 @@ const App = () => {
 
                       <div>
                         <span className="text-slate-700 font-bold flex items-center gap-2 mb-3">
-                          2. 選擇表單主題風格
+                          2. 選擇底色主題風格
                         </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {themes.map(theme => (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {baseStyles.map(style => (
                             <div 
-                              key={theme.name}
-                              onClick={() => setSelectedTheme(theme.name)}
-                              className={`p-3 rounded-xl border-2 cursor-pointer flex items-center gap-3 transition-all ${
-                                selectedTheme === theme.name ? 'border-pink-500 bg-pink-50' : 'border-slate-200 hover:border-pink-300 bg-white'
+                              key={style.name}
+                              onClick={() => setSelectedStyle(style.name)}
+                              className={`p-2.5 rounded-xl border-2 cursor-pointer flex items-center gap-3 transition-all ${
+                                selectedStyle === style.name ? 'border-pink-500 bg-pink-50 text-pink-700' : 'border-slate-200 hover:border-pink-300 bg-white text-slate-600'
                               }`}
                             >
-                              <div className="flex -space-x-1">
-                                {theme.colors.map((c, i) => <div key={i} className={`w-4 h-4 rounded-full border border-white/50 shadow-sm ${c}`}></div>)}
+                              <div className="flex -space-x-1 shrink-0">
+                                {style.colors.map((c, i) => <div key={i} className={`w-3.5 h-3.5 rounded-full border border-white/50 shadow-sm ${c}`}></div>)}
                               </div>
-                              <div className="flex flex-col">
-                                <span className={`text-sm font-medium ${selectedTheme === theme.name ? 'text-pink-800' : 'text-slate-600'}`}>
-                                  {theme.name.split(' ')[0]}
-                                </span>
-                                {(theme as any).isDynamic && (
-                                  <span className="text-[10px] text-pink-500 font-bold flex items-center gap-0.5 animate-pulse">
-                                    <Sparkles className="w-2.5 h-2.5" /> 動態背景
-                                  </span>
-                                )}
-                              </div>
+                              <span className="text-xs font-bold leading-tight">
+                                {style.name.split(' ')[0]}
+                              </span>
                             </div>
                           ))}
                         </div>
