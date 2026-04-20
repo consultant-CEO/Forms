@@ -47,12 +47,14 @@ const callGemini = async (prompt: string, systemPrompt?: string) => {
     if (!key) {
       throw new Error('找不到 API 金鑰（GEMINI_API_KEY）。如果您在 GitHub 上部署，請至 Settings > Secrets 設定金鑰。');
     }
-    const ai = new GoogleGenAI(key);
-    const model = ai.getGenerativeModel({ 
-      model: DEFAULT_MODEL,
-      systemInstruction: systemPrompt
-    });
-    const result = await model.generateContent(prompt);
+    const genAI = new GoogleGenAI({ apiKey: key }) as any;
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    // Using system instruction as part of the content generation for better compatibility if needed, 
+    // but the SDK supports systemInstruction in the params.
+    const result = await model.generateContent(
+      systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt
+    );
     return result.response.text();
   } catch (error: any) {
     console.error("Gemini Error:", error);
