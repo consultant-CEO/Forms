@@ -38,9 +38,27 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
 const DEFAULT_MODEL = "gemini-3-flash-preview";
+
+// Safe AI caller
+const callGemini = async (prompt: string, systemPrompt?: string) => {
+  try {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error('找不到 API 金鑰（GEMINI_API_KEY）。如果您在 GitHub 上部署，請至 Settings > Secrets 設定金鑰。');
+    }
+    const ai = new GoogleGenAI(key);
+    const model = ai.getGenerativeModel({ 
+      model: DEFAULT_MODEL,
+      systemInstruction: systemPrompt
+    });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error: any) {
+    console.error("Gemini Error:", error);
+    throw error;
+  }
+};
 
 const App = () => {
   // --- States ---
@@ -197,22 +215,6 @@ const App = () => {
 
   const toggleCheck = (id: string) => {
     setCheckedSteps(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const callGemini = async (prompt: string, systemInstruction: string) => {
-    try {
-      const response = await ai.models.generateContent({
-        model: DEFAULT_MODEL,
-        contents: [{ parts: [{ text: prompt }] }],
-        config: {
-          systemInstruction: systemInstruction,
-        },
-      });
-      return response.text || "";
-    } catch (error) {
-      console.error("AI Generation Error:", error);
-      return "";
-    }
   };
 
   // 1. 生成問卷內容
