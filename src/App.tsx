@@ -213,7 +213,7 @@ const App = () => {
     { id: 'step-c', text: '點擊上方工具列的「💾 儲存」按鈕。' },
     { id: 'step-d', text: '點擊上方工具列的「▷ 執行」按鈕。' },
     { id: 'step-e', text: '首次執行需點擊「審查權限」➔ 選擇帳號 ➔ 進階 ➔ 前往專案 (不安全) ➔ 允許。' },
-    { id: 'step-f', text: '執行完成後，在下方「執行記錄」中會顯示表單網址，點擊即可開啟！' }
+    { id: 'step-f', text: '執行完成後，在下方「執行記錄」中會顯示表單網址，複製網址貼上新網頁即可開啟google表單！' }
   ];
 
   // --- Functions ---
@@ -450,7 +450,7 @@ const App = () => {
               animate={{ x: 0, opacity: 1 }}
             >
               <h1 className="text-3xl font-bold flex items-center gap-3">
-                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.1.0</span>
+                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.1.1</span>
               </h1>
               <p className="mt-2 text-blue-100 opacity-90">從構思到客製化網頁，AI 一站式幫您搞定表單</p>
             </motion.div>
