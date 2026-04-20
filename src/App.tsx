@@ -42,22 +42,34 @@ const DEFAULT_MODEL = "gemini-3-flash-preview";
 
 // Safe AI caller
 const callGemini = async (prompt: string, systemPrompt?: string) => {
+  console.log("Calling Gemini with prompt length:", prompt.length);
   try {
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       throw new Error('找不到 API 金鑰（GEMINI_API_KEY）。如果您在 GitHub 上部署，請至 Settings > Secrets 設定金鑰。');
     }
-    const genAI = new GoogleGenAI({ apiKey: key }) as any;
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const ai = new GoogleGenAI({ apiKey: key });
     
-    // Using system instruction as part of the content generation for better compatibility if needed, 
-    // but the SDK supports systemInstruction in the params.
-    const result = await model.generateContent(
-      systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt
-    );
-    return result.response.text();
+    // Using gemini-3-flash-preview which is the recommended model
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        systemInstruction: systemPrompt
+      }
+    });
+
+    const text = response.text;
+    if (!text) {
+      throw new Error("AI 回傳內容為空");
+    }
+    console.log("Gemini response received, length:", text.length);
+    return text;
   } catch (error: any) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Error Detail:", error);
+    if (error.message?.includes('quota')) {
+      throw new Error('AI 使用額度已達上限，請稍後再試。');
+    }
     throw error;
   }
 };
@@ -224,27 +236,46 @@ const App = () => {
     if (!checkAiLimit()) return;
     setStep(2);
     setIsGenerating(true);
-    const systemPrompt = `你是一位專業的問卷設計師。請根據使用者的「目的」與「對象」設計邏輯嚴謹的問卷內容。
-    必須包含：1.問卷標題 2.開場白 3.完整題目清單(標註題型) 4.致謝辭。
-    不要提供視覺或色彩建議，純文字格式即可。`;
+    setGeneratedContent(""); // Clear previous content
 
-    const text = await callGemini(`問卷目的：${formData.purpose}\n問卷對象：${formData.target}`, systemPrompt);
-    setGeneratedContent(text);
-    setIsGenerating(false);
+    try {
+      const systemPrompt = `你是一位專業的問卷設計師。請根據使用者的「目的」與「對象」設計邏輯嚴謹的問卷內容。
+      必須包含：1.問卷標題 2.開場白 3.完整題目清單(標註題型) 4.致謝辭。
+      不要提供視覺或色彩建議，純文字格式即可。`;
+
+      const text = await callGemini(`問卷目的：${formData.purpose}\n問卷對象：${formData.target}`, systemPrompt);
+      if (text) {
+        setGeneratedContent(text);
+      } else {
+        throw new Error("AI 回傳內容為空");
+      }
+    } catch (error: any) {
+      console.error("Generate Error:", error);
+      alert("生成失敗：" + (error.message || "未知錯誤"));
+      setStep(1); // Return to step 1 on failure
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // 2. AI 魔法微調
   const tweakSurveyContent = async (tweakPrompt: string) => {
     if (!checkAiLimit()) return;
     setIsTweaking(true);
-    const systemPrompt = `你是一位專業問卷設計師。請根據使用者的「修改指示」，針對「目前問卷內容」進行調整。
-    請直接輸出修改後的完整問卷內容，保持原有架構(標題、開場白、題目、致謝辭)，絕對不要加上任何額外的問候語或解釋說明文字。`;
-    
-    const userQuery = `【修改指示】：${tweakPrompt}\n\n【目前問卷內容】：\n${generatedContent}`;
+    try {
+      const systemPrompt = `你是一位專業問卷設計師。請根據使用者的「修改指示」，針對「目前問卷內容」進行調整。
+      請直接輸出修改後的完整問卷內容，保持原有架構(標題、開場白、題目、致謝辭)，絕對不要加上任何額外的問候語或解釋說明文字。`;
+      
+      const userQuery = `【修改指示】：${tweakPrompt}\n\n【目前問卷內容】：\n${generatedContent}`;
 
-    const text = await callGemini(userQuery, systemPrompt);
-    if (text) setGeneratedContent(text);
-    setIsTweaking(false);
+      const text = await callGemini(userQuery, systemPrompt);
+      if (text) setGeneratedContent(text);
+    } catch (error: any) {
+      console.error("Tweak Error:", error);
+      alert("微調失敗：" + (error.message || "未知錯誤"));
+    } finally {
+      setIsTweaking(false);
+    }
   };
 
   // 3. 生成 GAS 程式碼
@@ -252,17 +283,26 @@ const App = () => {
     if (!checkAiLimit()) return;
     setStep(3);
     setIsGenerating(true);
-    const systemPrompt = `你精通 Google Apps Script。請根據「問卷內容」撰寫一段自動建立 Google 表單的程式碼。
-    嚴格要求：
-    1. 只能輸出可執行的 JS 程式碼。
-    2. 絕對不分頁 (不使用 addPageBreakItem)。
-    3. 自動判斷題型 (addMultipleChoiceItem, addCheckboxItem, addTextItem 等)。
-    4. 必須加上 try { form.setRequireLogin(false); } catch(e) {} 來確保表單公開。使用 try-catch 是為了避免一般 Gmail 個人帳號執行此方法時引發 "This operation is not supported" 的錯誤。
-    5. 結尾必須加上 Logger.log('Form created at: ' + form.getEditUrl());`;
+    try {
+      const systemPrompt = `你精通 Google Apps Script。請根據「問卷內容」撰寫一段自動建立 Google 表單的程式碼。
+      嚴格要求：
+      1. 只能輸出可執行的 JS 程式碼。
+      2. 絕對不分頁 (不使用 addPageBreakItem)。
+      3. 自動判斷題型 (addMultipleChoiceItem, addCheckboxItem, addTextItem 等)。
+      4. 必須加上 try { form.setRequireLogin(false); } catch(e) {} 來確保表單公開。使用 try-catch 是為了避免一般 Gmail 個人帳號執行此方法時引發 "This operation is not supported" 的錯誤。
+      5. 結尾必須加上 Logger.log('Form created at: ' + form.getEditUrl());`;
 
-    const text = await callGemini(`問卷內容：\n${generatedContent}`, systemPrompt);
-    setGasCode(text.replace(/`{3}(?:javascript|js)?\n|`{3}/gi, '').trim());
-    setIsGenerating(false);
+      const text = await callGemini(`問卷內容：\n${generatedContent}`, systemPrompt);
+      if (text) {
+        setGasCode(text.replace(/`{3}(?:javascript|js)?\n|`{3}/gi, '').trim());
+      }
+    } catch (error: any) {
+      console.error("GAS Error:", error);
+      alert("程式碼生成失敗：" + (error.message || "未知錯誤"));
+      setStep(2);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // 4. 生成 HTML
@@ -410,7 +450,7 @@ const App = () => {
               animate={{ x: 0, opacity: 1 }}
             >
               <h1 className="text-3xl font-bold flex items-center gap-3">
-                <FileText className="w-8 h-8" /> Google 問卷魔法師
+                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.1.0</span>
               </h1>
               <p className="mt-2 text-blue-100 opacity-90">從構思到客製化網頁，AI 一站式幫您搞定表單</p>
             </motion.div>
