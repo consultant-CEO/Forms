@@ -322,19 +322,22 @@ const App = () => {
        <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted){ document.getElementById('success-message').style.display='flex'; document.getElementById('custom-form').style.display='none'; }"></iframe>
        同時 form 標籤加上 onsubmit="window.submitted = true;"
     6. 依據「底色主題風格」設計 RWD 介面。必須包含一個預設隱藏的精美成功訊息區塊 (id="success-message", style="display:none;") 與表單區塊 (id="custom-form")。
-    7. 響應式佈局要求：
-       - 表單容器必須使用 max-w-4xl mx-auto w-full px-4，確保在電腦上寬度更加開闊，在手機上自動適配。
-       - 文字大小需具備流動性，標題使用 text-2xl md:text-4xl，一般文字使用 text-base md:text-xl，確保大螢幕上有更佳的視覺呈現。
+    7. 佈局與可讀性極致優化 (解決文字重疊問題)：
+       - 使用容器 max-w-4xl mx-auto w-full px-6 py-12，確保內容在大螢幕上有充足的呼吸空間，不與邊緣重疊。
+       - 題目卡片必須有明確的間距 (mb-8) 與內距 (p-6 或 p-8)，背景色與文字色必須有強烈對比 (High Contrast)。
+       - 標題使用 text-2xl md:text-5xl font-extrabold，並確保下方有足夠的 margin (mb-6)。
+       - 一般文字與標籤使用 text-base md:text-lg leading-relaxed，確保字距與行距足夠。
+       - 所有輸入框與按鈕必須有明確的高寬與 padding，不可以讓文字緊貼邊框。
     8. 組合設計要求：
        - 你需要將「底色主題風格」的外觀規範，套用到該 HTML 中。
        - 特定風格規範：
-         - 「玻璃擬態」：使用 backdrop-blur-md 與透明度背景，容器邊框建議帶有極細的白色半透明描邊。
-         - 「暗黑奢華」：使用純黑背景搭配金/古銅色 (amber/orange) 元素，字體使用優雅的 Serif。
-         - 「粗獷主義」：使用極粗黑框 (border-4)、亮黃/亮綠配色、不使用圓角 (rounded-none)，字體使用粗體大文字。
-         - 「手寫筆記風」：背景使用淺米色，表單欄位像是在橫線紙上的排版，帶有淡藍/淡紅的隔線感，使用手寫體風格的字體 (可用 Google Fonts)。
+         - 「玻璃擬態」：使用 backdrop-blur-xl 與透明背景，容器邊框建議帶有細緻的白色半透明描邊。文字必須使用暗色調或強烈的亮色調，並確保有 text-shadow 以增加可讀性。
+         - 「暗黑奢華」：使用純黑背景搭配金/古銅色 (amber/orange) 元素。字體使用優雅的 Serif，並加上適當的 letter-spacing。
+         - 「粗獷主義」：使用極粗黑框 (border-4)、亮黃/亮綠配色、不使用圓角 (rounded-none)，字體使用超大超粗體文字。
+         - 「手寫筆記風」：背景使用淺米色，使用 Google Fonts (如 Nanum Pen Script) 模擬手寫感，表單欄位像是在橫線紙上的排版。
          - 「復古 90 年代」：模擬舊 Windows 視窗介面，使用灰色立體邊框 (#c0c0c0)、藍色標題列與 Pixel 風格字體。
-         - 「清新雜誌報刊」：大標題、大量留白、字體使用優雅的 Serif 與 Sans-serif 混搭，版面偏向報紙排版。
-    8. 安全性要求 (程式碼保護)：
+         - 「清新雜誌報刊」：大標題、大量留白 (p-16)、字體使用優雅的 Serif 與 Sans-serif 混搭，版面偏向報紙排版，注重排版美感。
+    9. 安全性要求 (程式碼保護)：
        - 在生成的 HTML 中加入 JavaScript，禁用右鍵選單 (contextmenu)。
        - 禁用常見的開發者工具快捷鍵 (F12, Ctrl+Shift+I, Ctrl+U)。
        - 透過簡單的變數名混淆或邏輯處理，保護表單原始提交路徑不被直接識別。
@@ -450,7 +453,7 @@ const App = () => {
               animate={{ x: 0, opacity: 1 }}
             >
               <h1 className="text-3xl font-bold flex items-center gap-3">
-                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.1.1</span>
+                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.1.2</span>
               </h1>
               <p className="mt-2 text-blue-100 opacity-90">從構思到客製化網頁，AI 一站式幫您搞定表單</p>
             </motion.div>
