@@ -33,6 +33,7 @@ import {
   CheckSquare,
   Square,
   Save,
+  Upload,
   AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -322,25 +323,26 @@ const App = () => {
        <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(window.submitted){ document.getElementById('success-message').style.display='flex'; document.getElementById('custom-form').style.display='none'; }"></iframe>
        同時 form 標籤加上 onsubmit="window.submitted = true;"
     6. 依據「底色主題風格」設計 RWD 介面。必須包含一個預設隱藏的精美成功訊息區塊 (id="success-message", style="display:none;") 與表單區塊 (id="custom-form")。
-    7. 佈局與可讀性極致優化 (解決文字重疊問題)：
-       - 使用容器 max-w-4xl mx-auto w-full px-6 py-12，確保內容在大螢幕上有充足的呼吸空間，不與邊緣重疊。
-       - 題目卡片必須有明確的間距 (mb-8) 與內距 (p-6 或 p-8)，背景色與文字色必須有強烈對比 (High Contrast)。
-       - 標題使用 text-2xl md:text-5xl font-extrabold，並確保下方有足夠的 margin (mb-6)。
-       - 一般文字與標籤使用 text-base md:text-lg leading-relaxed，確保字距與行距足夠。
-       - 所有輸入框與按鈕必須有明確的高寬與 padding，不可以讓文字緊貼邊框。
-    8. 組合設計要求：
+    7. 佈局與可讀性極致優化：
+       - 使用容器 max-w-4xl mx-auto w-full px-6 py-12。
+       - 題目卡片必須有明確的間距 (mb-8) 與內距 (p-6)。
+    8. **特殊欄位處理 (重大限制說明)**：
+       - **「檔案上傳/新增檔案」欄位**：
+         - 【核心限制】Google 官方規定「檔案上傳」欄位僅能在 Google 網域內的表單使用。第三方美化網頁無法透過傳統方式提交檔案到 Google 表單。
+         - 【解決方案】在生成的 HTML 中，若原始碼包含檔案上傳類型，請將該欄位轉換為「文字輸入框 (Text Input)」。
+         - 【提示文字】在該輸入框上方標註：「⚠️ 檔案上傳限制：請先將檔案(如發票照片)上傳至您的雲端硬碟/相簿，並在此貼上『分享連結』。由於 Google 安全限制，自訂美化網頁無法直接上傳實體檔案。」
+    9. 組合設計要求：
        - 你需要將「底色主題風格」的外觀規範，套用到該 HTML 中。
        - 特定風格規範：
-         - 「玻璃擬態」：使用 backdrop-blur-xl 與透明背景，容器邊框建議帶有細緻的白色半透明描邊。文字必須使用暗色調或強烈的亮色調，並確保有 text-shadow 以增加可讀性。
-         - 「暗黑奢華」：使用純黑背景搭配金/古銅色 (amber/orange) 元素。字體使用優雅的 Serif，並加上適當的 letter-spacing。
-         - 「粗獷主義」：使用極粗黑框 (border-4)、亮黃/亮綠配色、不使用圓角 (rounded-none)，字體使用超大超粗體文字。
-         - 「手寫筆記風」：背景使用淺米色，使用 Google Fonts (如 Nanum Pen Script) 模擬手寫感，表單欄位像是在橫線紙上的排版。
-         - 「復古 90 年代」：模擬舊 Windows 視窗介面，使用灰色立體邊框 (#c0c0c0)、藍色標題列與 Pixel 風格字體。
-         - 「清新雜誌報刊」：大標題、大量留白 (p-16)、字體使用優雅的 Serif 與 Sans-serif 混搭，版面偏向報紙排版，注重排版美感。
-    9. 安全性要求 (程式碼保護)：
+         - 「玻璃擬態」：使用 backdrop-blur-xl 與透明背景。文字必須有 text-shadow。
+         - 「暗黑奢華」：使用純黑背景搭配金/古銅色元素。
+         - 「粗獷主義」：使用極粗黑框 (border-4)、亮黃/亮綠配色、不使用圓角 (rounded-none)。
+         - 「手寫筆記風」：背景使用淺米色，使用手寫感字體。
+         - 「復古 90 年代」：模擬舊 Windows 視窗介面。
+         - 「清新雜誌報刊」：大標題、大量留白 (p-16)、字體使用優雅的 Serif 與 Sans-serif 混搭。
+    10. 安全性要求 (程式碼保護)：
        - 在生成的 HTML 中加入 JavaScript，禁用右鍵選單 (contextmenu)。
        - 禁用常見的開發者工具快捷鍵 (F12, Ctrl+Shift+I, Ctrl+U)。
-       - 透過簡單的變數名混淆或邏輯處理，保護表單原始提交路徑不被直接識別。
     
     再次警告：只回傳 HTML 程式碼，開頭必須是 <!DOCTYPE html>，不要說任何廢話。`;
 
@@ -386,6 +388,20 @@ const App = () => {
     a.download = `custom_survey_${Date.now()}.html`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleSourceCodeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result;
+      if (typeof content === 'string') {
+        setFormSourceCode(content);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const isValidSourceCode = formSourceCode.trim() === '' || 
@@ -453,7 +469,7 @@ const App = () => {
               animate={{ x: 0, opacity: 1 }}
             >
               <h1 className="text-3xl font-bold flex items-center gap-3">
-                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.1.2</span>
+                <FileText className="w-8 h-8" /> Google 問卷魔法師 <span className="text-sm font-medium bg-blue-500/50 px-2 py-0.5 rounded-full border border-blue-400/30">v1.2.1</span>
               </h1>
               <p className="mt-2 text-blue-100 opacity-90">從構思到客製化網頁，AI 一站式幫您搞定表單</p>
             </motion.div>
